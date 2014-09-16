@@ -4,8 +4,6 @@ from __future__ import division
 import numpy as np
 import emcee
 
-from astroML.time_series import MultiTermFit, multiterm_periodogram
-
 
 def multiterm_model(t, omega, theta, broadcast=True):
     """
@@ -59,63 +57,106 @@ def log_likelihood_mixture(t, y, dy, omega, Pb, Vb, Yb, theta):
                                np.log(Pb) + loglike_bg))
 
 
-class MultiTermMixtureFit(object):
-    def __init__(self, omega, n_terms,
-                 nwalkers = 50, nburn = 1000, nsteps = 2000, Pb=0.1):
+class MultiTermFit(object):
+    """Multi-term Fourier fit to a light curve
+
+    Parameters
+    ----------
+    omega : float
+        angular frequency of the fundamental mode
+    n_terms : int
+        the number of Fourier modes to use in the fit
+    """
+    def __init__(self, omega, n_terms):
         self.omega = omega
         self.n_terms = n_terms
-        self.nwalkers = nwalkers
-        self.nburn = nburn
-        self.nsteps = nsteps
-        self.Pb = Pb
 
-    def log_prior_mixture(self, params):
-        return 1
+    def _make_X(self, t):
+        t = np.asarray(t)
+        k = np.arange(1, self.n_terms + 1)
+        X = np.hstack([np.ones(t[:, None].shape),
+                       np.sin(k * self.omega * t[:, None]),
+                       np.cos(k * self.omega * t[:, None])])
+        return X
 
-    def log_likelihood_mixture(self, params, t, y, dy, omega, Pb, Yb, Vb):
-        return log_likelihood_mixture(t, y, dy, omega,
-                                      Pb, Vb, Yb, params)
-    
+    def log_likelihood(self, t, y, dy):
+        y_model = self.compute_model(t)
+        Vy = dy ** 2
+        return -0.5 * np.sum(np.log(2 * np.pi * Vy) + (y - y_model) ** 2 / Vy)
+
     def fit(self, t, y, dy):
-        # Do a simple fit to find the starting guess
-        self.simple_fit_ = MultiTermFit(self.omega, self.n_terms)
-        self.simple_fit_.fit(t, y, dy)
-        w_best = list(self.simple_fit_.w_)
+        """Fit multiple Fourier terms to the data
 
-        Vb = 25 * np.var(y)
-        Yb = np.mean(y)
+        Parameters
+        ----------
+        t: array_like
+            observed times
+        y: array_like
+            observed fluxes or magnitudes
+        dy: array_like
+            observed errors on y
 
-        starting_guess = w_best
-        log_prior = self.log_prior_mixture
-        log_likelihood = self.log_likelihood_mixture
+        Returns
+        -------
+        self :
+            The MultiTermFit object is  returned
+        """
+        t = np.asarray(t)
+        y = np.asarray(y)
+        dy = np.asarray(dy)
 
-        def log_posterior(params, t, y, dy, omega, Pb, Vb, Yb):
-            lnprior = log_prior(params)
-            if np.isneginf(lnprior):
-                return lnprior
-            else:
-                return lnprior + log_likelihood(params, t, y, dy,
-                                                omega, Pb, Vb, Yb)
+        X_scaled = self._make_X(t) / dy[:, None]
+        y_scaled = y / dy
 
-        ndim = len(starting_guess)
-        starting_guesses = np.random.normal(starting_guess, 0.1,
-                                            size=(self.nwalkers, ndim))
-
-        sampler = emcee.EnsembleSampler(self.nwalkers, ndim, log_posterior,
-                                        args=[t, y, dy, self.omega, self.Pb,
-                                              Vb, Yb])
-        sampler.run_mcmc(starting_guesses, self.nsteps)
-        self.emcee_trace_ = sampler.chain[:, self.nburn:, :].reshape(-1,ndim).T
-        self.w_ = self.emcee_trace_.mean(1)
-
+        self.t_ = t
+        self.w_ = np.linalg.solve(np.dot(X_scaled.T, X_scaled),
+                                  np.dot(X_scaled.T, y_scaled))
         return self
 
-    def predict(self, *args, **kwargs):
-        self.simple_fit_.w_ = self.w_
-        return self.simple_fit_.predict(*args, **kwargs)
+    def compute_model(self, t):
+        return np.dot(self._make_X(t), self.w_)
+
+    def predict(self, Nphase, return_phased_times=False, adjust_offset=True):
+        """Compute the phased fit, and optionally return phased times
+
+        Parameters
+        ----------
+        Nphase : int
+            Number of terms to use in the phased fit
+        return_phased_times : bool
+            If True, then return a phased version of the input times
+        adjust_offset : bool
+            If true, then shift results so that the minimum value is at phase 0
+
+        Returns
+        -------
+        phase, y_fit : ndarrays
+            The phase and y value of the best-fit light curve
+        phased_times : ndarray
+            The phased version of the training times.  Returned if
+            return_phased_times is set to  True.
+        """
+        phase_fit = np.linspace(0, 1, Nphase + 1)[:-1]
+        y_fit = self.compute_model(2 * np.pi * phase_fit / self.omega)
+
+        if adjust_offset:
+            i_offset = np.argmin(y_fit)
+            y_fit = np.concatenate([y_fit[i_offset:], y_fit[:i_offset]])
+
+        if return_phased_times:
+            if adjust_offset:
+                offset = phase_fit[i_offset]
+            else:
+                offset = 0
+            phased_times = (self.t_ * self.omega * 0.5 / np.pi - offset) % 1
+
+            return phase_fit, y_fit, phased_times
+
+        else:
+            return phase_fit, y_fit
 
 
-class MultiTermMixtureFit2(object):
+class MultiTermFitMCMC(MultiTermFit):
     def __init__(self, omega, n_terms,
                  nwalkers = 50, nburn = 1000, nsteps = 2000):
         self.omega = omega
@@ -124,49 +165,63 @@ class MultiTermMixtureFit2(object):
         self.nburn = nburn
         self.nsteps = nsteps
 
-    def log_prior_mixture(self, params):
-        if params[0] < 0 or params[0] > 1 or params[1] <= 0:
-            return -np.inf
+    def log_prior(self, params):
+        return 1
+
+    def log_likelihood(self, params, t, y, dy):
+        self.w_ = params
+        return MultiTermFit.log_likelihood(self, t, y, dy)
+
+    def log_posterior(self, params, t, y, dy):
+        lnprior = self.log_prior(params)
+        if np.isneginf(lnprior):
+            return lnprior
         else:
-            return 1
+            return lnprior + self.log_likelihood(params, t, y, dy)
 
-    def log_likelihood_mixture(self, params, t, y, dy, omega):
-        return log_likelihood_mixture(t, y, dy, omega,
-                                      params[0], params[1], params[2],
-                                      params[3:])
-    
     def fit(self, t, y, dy):
-        # Do a simple fit to find the starting guess
-        self.simple_fit_ = MultiTermFit(self.omega, self.n_terms)
-        self.simple_fit_.fit(t, y, dy)
-        w_best = list(self.simple_fit_.w_)
+        t, y, dy = map(np.asarray, (t, y, dy))
 
-        Vb = 25 * np.var(y)
-        Yb = np.mean(y)
+        # initialize with a non-robust fit
+        MultiTermFit.fit(self, t, y, dy)
+        w0 = self.w_
+        
+        # vary starting guesses around the closed-form guess
+        ndim = len(w0)
+        starting_guesses = w0 * (0.99 + 0.02
+                                 * np.random.rand(self.nwalkers, ndim))
 
-        starting_guess = [0.1, Vb, Yb] + list(w_best)
-        log_prior = self.log_prior_mixture
-        log_likelihood = self.log_likelihood_mixture
-
-        def log_posterior(params, t, y, dy, omega):
-            lnprior = log_prior(params)
-            if np.isneginf(lnprior):
-                return lnprior
-            else:
-                return lnprior + log_likelihood(params, t, y, dy, omega)
-
-        ndim = len(starting_guess)
-        starting_guesses = np.random.normal(starting_guess, 0.1,
-                                            size=(self.nwalkers, ndim))
-
-        sampler = emcee.EnsembleSampler(self.nwalkers, ndim, log_posterior,
-                                        args=[t, y, dy, self.omega])
+        sampler = emcee.EnsembleSampler(self.nwalkers, ndim,
+                                        self.log_posterior,
+                                        args=[t, y, dy])
         sampler.run_mcmc(starting_guesses, self.nsteps)
         self.emcee_trace_ = sampler.chain[:, self.nburn:, :].reshape(-1,ndim).T
         self.w_ = self.emcee_trace_.mean(1)
 
         return self
 
-    def predict(self, *args, **kwargs):
-        self.simple_fit_.w_ = self.w_[3:]
-        return self.simple_fit_.predict(*args, **kwargs)
+
+class MultiTermMixtureFitMCMC(MultiTermFitMCMC):
+    def __init__(self, omega, n_terms, Pb=0.1,
+                 nwalkers = 50, nburn = 1000, nsteps = 2000):
+        self.Pb = Pb
+        MultiTermFitMCMC.__init__(self, omega, n_terms,
+                                  nwalkers=nwalkers, nburn=nburn,
+                                  nsteps=nsteps)
+
+    def fit(self, t, y, dy):
+        self.Vb = 25 * np.var(y)
+        self.Yb = np.mean(y)
+        return MultiTermFitMCMC.fit(self, t, y, dy)
+
+    def log_likelihood(self, params, t, y, dy):
+        self.w_ = params
+        y_model = self.compute_model(t)
+        Vy = dy ** 2
+        VyVb = Vy + self.Vb
+        loglike_model = -0.5 * (np.log(2 * np.pi * Vy)
+                                + (y - y_model) ** 2 / Vy)
+        loglike_bg = -0.5 * (np.log(2 * np.pi * VyVb)
+                             + (y - self.Yb) ** 2 / VyVb)
+        return np.sum(np.logaddexp(np.log(1 - self.Pb) + loglike_model,
+                                   np.log(self.Pb) + loglike_bg))
