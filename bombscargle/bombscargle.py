@@ -82,7 +82,7 @@ class MultiTermMixtureFit(object):
         self.simple_fit_.fit(t, y, dy)
         w_best = list(self.simple_fit_.w_)
 
-        Vb = 100 * np.var(y)
+        Vb = 25 * np.var(y)
         Yb = np.mean(y)
 
         starting_guess = w_best
@@ -112,4 +112,61 @@ class MultiTermMixtureFit(object):
 
     def predict(self, *args, **kwargs):
         self.simple_fit_.w_ = self.w_
+        return self.simple_fit_.predict(*args, **kwargs)
+
+
+class MultiTermMixtureFit2(object):
+    def __init__(self, omega, n_terms,
+                 nwalkers = 50, nburn = 1000, nsteps = 2000):
+        self.omega = omega
+        self.n_terms = n_terms
+        self.nwalkers = nwalkers
+        self.nburn = nburn
+        self.nsteps = nsteps
+
+    def log_prior_mixture(self, params):
+        if params[0] < 0 or params[0] > 1 or params[1] <= 0:
+            return -np.inf
+        else:
+            return 1
+
+    def log_likelihood_mixture(self, params, t, y, dy, omega):
+        return log_likelihood_mixture(t, y, dy, omega,
+                                      params[0], params[1], params[2],
+                                      params[3:])
+    
+    def fit(self, t, y, dy):
+        # Do a simple fit to find the starting guess
+        self.simple_fit_ = MultiTermFit(self.omega, self.n_terms)
+        self.simple_fit_.fit(t, y, dy)
+        w_best = list(self.simple_fit_.w_)
+
+        Vb = 25 * np.var(y)
+        Yb = np.mean(y)
+
+        starting_guess = [0.1, Vb, Yb] + list(w_best)
+        log_prior = self.log_prior_mixture
+        log_likelihood = self.log_likelihood_mixture
+
+        def log_posterior(params, t, y, dy, omega):
+            lnprior = log_prior(params)
+            if np.isneginf(lnprior):
+                return lnprior
+            else:
+                return lnprior + log_likelihood(params, t, y, dy, omega)
+
+        ndim = len(starting_guess)
+        starting_guesses = np.random.normal(starting_guess, 0.1,
+                                            size=(self.nwalkers, ndim))
+
+        sampler = emcee.EnsembleSampler(self.nwalkers, ndim, log_posterior,
+                                        args=[t, y, dy, self.omega])
+        sampler.run_mcmc(starting_guesses, self.nsteps)
+        self.emcee_trace_ = sampler.chain[:, self.nburn:, :].reshape(-1,ndim).T
+        self.w_ = self.emcee_trace_.mean(1)
+
+        return self
+
+    def predict(self, *args, **kwargs):
+        self.simple_fit_.w_ = self.w_[3:]
         return self.simple_fit_.predict(*args, **kwargs)
