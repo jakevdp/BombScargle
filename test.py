@@ -2,7 +2,7 @@ import numpy as np
 from astroML.datasets import fetch_LINEAR_sample
 from astroML.time_series import multiterm_periodogram, MultiTermFit
 
-from noisyLS.noisyLS import MultiTermMixtureFit
+from bombscargle.bombscargle import MultiTermMixtureFit
 
 import matplotlib.pyplot as plt
 

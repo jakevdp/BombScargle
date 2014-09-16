@@ -1,4 +1,4 @@
-noisyLS
-=======
+Bomb-Scargle
+============
 
-Test implementation of a noisy multi-term Lomb-Scargle variant
+Test implementation of a robust multi-term Lomb-Scargle variant.
