@@ -3,6 +3,7 @@ from astroML.datasets import fetch_LINEAR_sample
 from astroML.time_series import multiterm_periodogram, MultiTermFit
 
 from bombscargle.bombscargle import (MultiTermFit, MultiTermFitMCMC,
+                                     MultiTermMixtureFitFull,
                                      MultiTermMixtureFit)
 
 import matplotlib.pyplot as plt
@@ -20,8 +21,8 @@ omega_best = omega[np.argmax(PSD)]
 print omega_best
 
 models = [MultiTermFit(omega_best, 6),
-          #MultiTermFitMCMC(omega_best, 6),
-          MultiTermMixtureFit(omega_best, 6)
+          MultiTermFitMCMC(omega_best, 6),
+          MultiTermMixtureFitFull(omega_best, 6)
 ]
 
 for model in models:

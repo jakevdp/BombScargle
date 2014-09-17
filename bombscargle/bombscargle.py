@@ -5,58 +5,6 @@ import numpy as np
 import emcee
 
 
-def multiterm_model(t, omega, theta, broadcast=True):
-    """
-    Compute the multi-term model at t given Omega and theta
-
-    Parameters
-    ----------
-    t : array_like
-        times of observation
-    omega : float
-        frequency of fit
-    theta : array_like
-        length (2n + 1) array, where n is the number of harmonics
-
-    Returns
-    -------
-    y : ndarray
-        the model evaluated at t
-    """
-    t = np.asarray(t)
-    theta = np.asarray(theta)
-    assert len(theta) % 2 == 1
-    nterms = (len(theta) - 1) // 2
-    An = theta[1:nterms + 1]
-    Bn = theta[nterms + 1:]
-
-    if broadcast:
-        args = (np.arange(1, len(An) + 1)[:, None] * omega * t)
-        return theta[0] + np.dot(An, np.sin(args)) + np.dot(Bn, np.cos(args))
-    else:
-        return theta[0] + sum(A * np.sin(omega * (m + 1) * t) +
-                              B * np.cos(omega * (m + 1) * t)
-                              for m, (A, B) in enumerate(zip(An, Bn)))
-
-
-def log_likelihood_pure(t, y, dy, omega, theta):
-    y_model = multiterm_model(t, omega, theta)
-    Vy = dy ** 2
-    return -0.5 * np.sum(np.log(2 * np.pi * Vy) + (y - y_model) ** 2 / Vy)
-
-
-def log_likelihood_mixture(t, y, dy, omega, Pb, Vb, Yb, theta):
-    y_model = multiterm_model(t, omega, theta)
-    Vy = dy ** 2
-    VyVb = Vy + Vb
-
-    loglike_model = -0.5 * (np.log(2 * np.pi * Vy) + (y - y_model) ** 2 / Vy)
-    loglike_bg = -0.5 * (np.log(2 * np.pi * VyVb) + (y - Yb) ** 2 / VyVb)
-
-    return np.sum(np.logaddexp(np.log(1 - Pb) + loglike_model,
-                               np.log(Pb) + loglike_bg))
-
-
 class MultiTermFit(object):
     """Multi-term Fourier fit to a light curve
 
@@ -228,4 +176,44 @@ class MultiTermMixtureFit(MultiTermFitMCMC):
 
 
 class MultiTermMixtureFitFull(MultiTermFitMCMC):
-    pass
+    def log_prior(self, params):
+        if params[0] < 0 or params[0] > 1 or params[1] < 1:
+            return -np.inf
+        else:
+            return 1
+
+    def log_likelihood(self, params, t, y, dy):
+        Pb, Vb, Yb = params[:3]
+        self.w_ = params[3:]
+        
+        y_model = self.compute_model(t)
+        Vy = dy ** 2
+        VyVb = Vy + Vb
+        loglike_model = -0.5 * (np.log(2 * np.pi * Vy)
+                                + (y - y_model) ** 2 / Vy)
+        loglike_bg = -0.5 * (np.log(2 * np.pi * VyVb)
+                             + (y - Yb) ** 2 / VyVb)
+        return np.sum(np.logaddexp(np.log(1 - Pb) + loglike_model,
+                                   np.log(Pb) + loglike_bg))
+
+    def fit(self, t, y, dy):
+        t, y, dy = map(np.asarray, (t, y, dy))
+
+        # initialize with a non-robust fit
+        MultiTermFit.fit(self, t, y, dy)
+        w0 = np.concatenate([[0.1, 25 * np.var(y), np.mean(y)],
+                             self.w_])
+        
+        # vary starting guesses around the closed-form guess
+        ndim = len(w0)
+        starting_guesses = w0 * (0.99 + 0.02
+                                 * np.random.rand(self.nwalkers, ndim))
+
+        sampler = emcee.EnsembleSampler(self.nwalkers, ndim,
+                                        self.log_posterior,
+                                        args=[t, y, dy])
+        sampler.run_mcmc(starting_guesses, self.nsteps)
+        self.emcee_trace_ = sampler.chain[:, self.nburn:, :].reshape(-1,ndim).T
+        self.w_ = self.emcee_trace_[3:, :].mean(1)
+
+        return self
