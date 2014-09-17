@@ -201,7 +201,7 @@ class MultiTermFitMCMC(MultiTermFit):
         return self
 
 
-class MultiTermMixtureFitMCMC(MultiTermFitMCMC):
+class MultiTermMixtureFit(MultiTermFitMCMC):
     def __init__(self, omega, n_terms, Pb=0.1,
                  nwalkers = 50, nburn = 1000, nsteps = 2000):
         self.Pb = Pb
@@ -225,3 +225,7 @@ class MultiTermMixtureFitMCMC(MultiTermFitMCMC):
                              + (y - self.Yb) ** 2 / VyVb)
         return np.sum(np.logaddexp(np.log(1 - self.Pb) + loglike_model,
                                    np.log(self.Pb) + loglike_bg))
+
+
+class MultiTermMixtureFitFull(MultiTermFitMCMC):
+    pass

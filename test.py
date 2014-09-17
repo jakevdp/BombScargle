@@ -3,7 +3,7 @@ from astroML.datasets import fetch_LINEAR_sample
 from astroML.time_series import multiterm_periodogram, MultiTermFit
 
 from bombscargle.bombscargle import (MultiTermFit, MultiTermFitMCMC,
-                                     MultiTermMixtureFitMCMC)
+                                     MultiTermMixtureFit)
 
 import matplotlib.pyplot as plt
 
@@ -20,8 +20,9 @@ omega_best = omega[np.argmax(PSD)]
 print omega_best
 
 models = [MultiTermFit(omega_best, 6),
-          MultiTermFitMCMC(omega_best, 6),
-          MultiTermMixtureFitMCMC(omega_best, 6)]
+          #MultiTermFitMCMC(omega_best, 6),
+          MultiTermMixtureFit(omega_best, 6)
+]
 
 for model in models:
     model = model.fit(t, y, dy)
@@ -31,4 +32,11 @@ for model in models:
     
 plt.errorbar(phased_t, y, dy, fmt='.k', ecolor='gray', alpha=0.2)
 plt.gca().invert_yaxis()
+
+plt.ylabel('magnitude')
+plt.xlabel('phase')
+plt.legend(['6-term Lomb-Scargle', '6-term Bomb-Scargle'])
+
+plt.savefig('test_output.png')
+
 plt.show()
