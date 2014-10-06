@@ -24,24 +24,21 @@ For any choice of $\omega$, we can find values $[a_0(\omega), b_0(\omega)]$ whic
   \chi^2(\omega) = \frac{1}{\sigma^2}\sum_{j=1}^N[y_j - f(t|\omega, a_0(\omega), b_0(\omega))]^2
 \end{equation}
 
-If we define $\chi_0^2 = \sigma^{-2}\sum y_j^2$, then we can write the *Lomb-Scargle Periodogram* as
+If we define $\chi_0^2 = \sigma^{-2}\sum y_j^2$, then we can write the {\it Lomb-Scargle Periodogram} as
 
 \begin{equation}
   P_{LS}(\omega) \equiv 1 - \frac{\chi^2(\omega)}{\chi_0^2}
 \end{equation}
 
-This periodogram is a normalized measure of the goodness-of-fit of a sinusoidal model with frequency $\omega$. Here I've purposely left-out the actual computation of $a_0(\omega)$ and $b_0(\omega)$, as well as the explicit expression to compute $P_{LS}$; we'll get to that below.
+This periodogram is a normalized measure of the goodness-of-fit of a sinusoidal model with frequency $\omega$. Here I've purposely left-out the actual computation of $a_0(\omega)$ and $b_0(\omega)$, as well as the explicit expression to compute $P_{LS}(\omega)$; we'll get to that below.
 
 \section{Computing $P_{LS}$}
 We can compute $P_{LS}$ using the above formalism.
 For later convenience, let's write our model in the form of a matrix-vector product:
-
 \begin{equation}
-  f(t|\omega, \theta) = X_\omega \theta
+  f(t|\omega, \theta) = X_\omega \theta,
 \end{equation}
-
-Where in the simple case above, $\theta = [a, b]^T$ and
-
+where in the simple case above, $\theta = [a, b]^T$ and
 \begin{equation}
   X_\omega = \left[\begin{array}{lll}
     \sin\omega t_1 && \cos\omega t_1\\
@@ -51,35 +48,27 @@ Where in the simple case above, $\theta = [a, b]^T$ and
   \end{array}\right]
 \end{equation}
 
-With this form, the $\chi^2$ can be written
-
+With this form, the $\chi^2$ can be concisely written
 \begin{equation}
-\chi^2(\omega, \theta) = \frac{1}{\sigma^2}(y - X_\omega b)^T(y - X_\omega b)
+\chi^2(\omega, \theta) = \frac{1}{\sigma^2}||y - X_\omega b||^2
 \end{equation}
-
-This can be minimized by the standard means to find the best-fit $b$:
-
+This can be minimized by the standard means to find the best-fit parameters:
 \begin{equation}
-  b_0 = (X_\omega^TX_\omega)^{-1}X_\omega^Ty
+  b_0 = (X_\omega^TX_\omega)^{-1}X_\omega^Ty.
 \end{equation}
-
 Plugging this back in to the expression for $\chi^2$ gives
-
 \begin{equation}
   \chi^2(\omega) = \frac{1}{\sigma^2}\left[
     y^Ty - y^TX_\omega(X_\omega^TX_\omega)^{-1}X_\omega^Ty
     \right]
 \end{equation}
-
-and we see that
-
+and comparing to the aboe definition we see that
 \begin{equation}
   P_{LS}(\omega) = \frac{y^TX_\omega(X_\omega^TX_\omega)^{-1}X_\omega^Ty}{y^Ty}
 \end{equation}
+Normally $P_{LS}$ is defined as some recipe of products of sines and cosines: all of that is contained in the above expression, and we won't repeat it here. Further, it is possible to use some tricks involving fast Fourier transforms to quickly compute the above expression for many frequencies $\omega$, but we won't get into that here.
 
-If we expand the above matrix expression, we can re-express this equation in terms of sums of sines and cosines of the input data, but that can be found elsewhere. One important piece of the computation is the ability to quickly compute the above expression over a large number of frequencies using the FFT, but we won't get into that here.
-
- The main point here is that fundamentally, the Lomb-Scargle periodogram is a normalized measure of the $\chi^2$ for a maximum-likelihood model fit. Further, by changing the definition of $X_\omega$ and adding more columns, we can quite easily account for an arbitrary offset $\mu$, include non-uniform errors $\sigma_j$, compute the periodogram for an arbitrary multi-frequency model, etc.
+The important point here is that fundamentally, the Lomb-Scargle periodogram is simply a normalized measure of the $\chi^2$ for a maximum-likelihood model fit of a particular single-frequency periodic model. Further, it's clear that by changing the definition of $X_\omega$ and adding more columns, we can quite easily account for an arbitrary offset $\mu$ (as in the *generalized Lomb-Scargle method* proposed by Zechmeister \& Kurster 2009), include non-uniform errors $\sigma_j$, compute the periodogram for an arbitrary multi-frequency model, etc.
 
 \section{Making this Robust}
 A well-known problem with the Lomb-Scargle periodogram is its lack of robustness to outliers: the Gaussian form of the likelihood expression means that if the errors $\sigma_j$ are mis-specified, the outlying point(s) will have an extremely large effect on the final fit. What is required is to replace the above $\chi^2$ computation with a robust model that can account for these errors.
