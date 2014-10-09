@@ -30,11 +30,11 @@ If we define $\chi_0^2 = \sigma^{-2}\sum y_j^2$, then we can write the {\it Lomb
   P_{LS}(\omega) \equiv 1 - \frac{\chi^2(\omega)}{\chi_0^2}
 \end{equation}
 
-This periodogram is a normalized measure of the goodness-of-fit of a sinusoidal model with frequency $\omega$. Here I've purposely left-out the actual computation of $a_0(\omega)$ and $b_0(\omega)$, as well as the explicit expression to compute $P_{LS}(\omega)$; we'll get to that below.
+This periodogram is a normalized measure of the goodness-of-fit of a sinusoidal model with frequency $\omega$, as compared to the null hypothesis of a pure-noise constant model, and lies in the range $0 \le P_{LS} \le 1$.
 
 \section{Computing $P_{LS}$}
-We can compute $P_{LS}$ using the above formalism.
-For later convenience, let's write our model in the form of a matrix-vector product:
+We can compute $P_{LS}$ quite easily via the above formalism.
+For later convenience, let's re-express our model in the form of a matrix-vector product:
 \begin{equation}
   f(t|\omega, \theta) = X_\omega \theta,
 \end{equation}
@@ -50,11 +50,11 @@ where in the simple case above, $\theta = [a, b]^T$ and
 
 With this form, the $\chi^2$ can be concisely written
 \begin{equation}
-\chi^2(\omega, \theta) = \frac{1}{\sigma^2}||y - X_\omega b||^2
+\chi^2(\omega, \theta) = \frac{1}{\sigma^2}||y - X_\omega \theta||^2
 \end{equation}
 This can be minimized by the standard means to find the best-fit parameters:
 \begin{equation}
-  b_0 = (X_\omega^TX_\omega)^{-1}X_\omega^Ty.
+  \theta_0 = (X_\omega^TX_\omega)^{-1}X_\omega^Ty.
 \end{equation}
 Plugging this back in to the expression for $\chi^2$ gives
 \begin{equation}
@@ -70,7 +70,89 @@ Normally $P_{LS}$ is defined as some recipe of products of sines and cosines: al
 
 The important point here is that fundamentally, the Lomb-Scargle periodogram is simply a normalized measure of the $\chi^2$ for a maximum-likelihood model fit of a particular single-frequency periodic model. Further, it's clear that by changing the definition of $X_\omega$ and adding more columns, we can quite easily account for an arbitrary offset $\mu$ (as in the {\it generalized Lomb-Scargle method} proposed by Zechmeister \& Kurster 2009), include non-uniform errors $\sigma_j$, compute the periodogram for an arbitrary multi-frequency model, etc.
 
+\section{Bayesian View}
+The Bayesian view of this starts with the likelihood. We'll specify this in terms of $M_\omega$, which is our model for a given frequency $\omega$. In this case, the likelihood is:
+
+\begin{equation}
+  p(D|M_\omega,\theta) =
+  (2\pi\sigma^2)^{-N/2} \exp\left(
+  \frac{-||y - X_\omega\theta||^2}{2\sigma^2}
+  \right)
+\end{equation}
+
+We can then use Bayes' rule and marginalize over $\theta$ to write
+
+\begin{equation}
+  p(M_\omega|D) = \frac{1}{p(D)}\int p(D|M_\omega,\theta)p(M_\omega, \theta){\rm d}^N\theta
+\end{equation}
+If we assume uniform priors ($p(M_\omega, \theta) \propto 1$) then it can be shown (see Appendix):
+
+\begin{equation}
+  \frac{p(M_\omega|D)}{p(M_0|D)} \propto \exp\left(\frac{P_{LS}(\omega)}{2\sigma^2}\right)
+\end{equation}
+where $M_0$ is the null model, defined as above with $X_\omega = 0$.
+
 \section{Making this Robust}
 A well-known problem with the Lomb-Scargle periodogram is its lack of robustness to outliers: the Gaussian form of the likelihood expression means that if the errors $\sigma_j$ are mis-specified, the outlying point(s) will have an extremely large effect on the final fit. What is required is to replace the above $\chi^2$ computation with a robust model that can account for these errors.
+
+\section{Appendix}
+Here is the calculation of the Bayes factor for our model.
+
+For separable priors $p(M_\omega,\theta) = p(M_\omega)p(\theta)$ the posterior for our linear model is:
+
+\begin{equation}
+  p(M_\omega|D) = \frac{p(M_\omega)}{p(D)}\int{\rm d}^N\theta(2\pi\sigma^2)^{-N/2}\exp\left(\frac{-||y - X_\omega\theta||^2}{2\sigma^2}\right)
+\end{equation}
+
+We can compute this integral by completing the square in $\theta$. Let's look at the argument of the exponent:
+
+\begin{equation}
+  ||y - X_\omega\theta||^2 = \theta^TX_\omega^TX_\omega\theta - 2\theta^TX_\omega^Ty + y^Ty
+\end{equation}
+
+If we now define the hermitian matrix $C = X_\omega^TX_\omega$ and find its Cholesky decomposition $U^TU = C$, then we can rewrite this as
+
+\begin{equation}
+  ||y - X_\omega\theta||^2 = ||v - U\theta||^2 + y^Ty - v^Tv
+\end{equation}
+
+where the length-N array $v$ satisfies $U^Tv = X_\omega^Ty$. Given this, we can rewrite the expression
+
+\begin{equation}
+  ||y - X_\omega\theta||^2 = ||v - U\theta||^2 + y^Ty - y^TX_\omega C^{-1}X_\omega^Ty
+\end{equation}
+
+The expression $\phi = v - U\theta$ is now an $\mathbf{R}^N\to\mathbf{R}^N$ mapping with a Jacobian given by $U$, so we can change variables to $\phi$ in the above integral to simplify its evaluation:
+
+\begin{equation}
+  p(M_\omega|D) = \frac{p(M_\omega)}{p(D)}\frac{(2\pi\sigma^2)^{-N/2}}{\det|U|}
+\int{\rm d}^N\phi\exp\left(\frac{-||\phi||^2 - y^Ty + y^TX_\omega(X_\omega^TX_\omega)^{-1}X_\omega^Ty}{2\sigma^2}\right)
+\end{equation}
+
+Observing that $\det|U|^2 = \det|C| = \det|X_\omega^TX_\omega|$ and evaluating the (now straightforward) integral gives
+
+\begin{equation}
+  p(M_\omega|D) = \frac{p(M_\omega)}{p(D)}\frac{1}{2^N\sqrt{\det|X_\omega^TX_\omega|}}
+  \exp\left(\frac{y^TX_\omega(X_\omega^TX_\omega)^{-1}X_\omega^Ty - y^Ty}{2\sigma^2}\right)
+\end{equation}
+
+Recalling that
+
+\begin{equation}
+  P_{LS}(\omega) = \frac{y^TX_\omega(X_\omega^TX_\omega)^{-1}X_\omega^Ty}{y^Ty}
+\end{equation}
+
+we see that we can express this
+
+\begin{equation}
+  p(M_\omega|D) = \frac{p(M_\omega)}{p(D)}\frac{1}{2^N\sqrt{\det|X_\omega^TX_\omega|}}
+  \exp\left(\frac{y^Ty(P_{LS}(\omega) - 1)}{2\sigma^2}\right)
+\end{equation}
+
+We can compare two models using the odds ratio:
+\begin{equation}
+  O_{\omega_1\omega_2} \equiv \frac{p(M_{\omega_2}|D)}{p(M_{\omega_1}|D)}
+  =\frac{p(M_{\omega_2})}{p(M_{\omega_1})}\sqrt{\frac{\det|X_{\omega_1}^TX_{\omega_1}|}{\det|X_{\omega_2}^TX_{\omega_2}|}}\exp\left(\frac{y^Ty(P_{LS}(\omega_2) - P_{LS}(\omega_1))}{2\sigma^2}\right)
+\end{equation}
 
 \end{document}
