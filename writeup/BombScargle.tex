@@ -3,7 +3,8 @@
 \begin{document}
 
 \section{Lomb-Scargle Periodogram}
-The Lomb-Scargle Periodogram is fundamentally a measure of a normalized chi-squared for fitting a sinusoidal model to data. Given data $\{t_j, y_j\}$ with uniform errors $\sigma$ we can choose a single-term linear sinusoidal model defined by the frequency $\omega$ and amplitudes $a$ and $b$:
+The Lomb-Scargle Periodogram is fundamentally a measure of a normalized chi-squared for fitting a sinusoidal model to data. Given data $\{t_j, y_j\}$ with homoscedastic Gaussian errors $\sigma$, and assuming that the mean was subtracted from ``raw'' data
+values $\{y_j\}$, we can choose a single-term linear sinusoidal model defined by the frequency $\omega$ and amplitudes $a$ and $b$:
 
 \begin{equation}
   f(t|\omega, a, b) \equiv a\sin(\omega t) + b\cos(\omega t)
@@ -12,10 +13,10 @@ The Lomb-Scargle Periodogram is fundamentally a measure of a normalized chi-squa
 Given this model, we can write the likelihood
 
 \begin{equation}
-  L \equiv p(\{t_j, y_j\}, \sigma~|~\omega, a, b) =
+\label{eq:dataL} 
+ L \equiv p(\{y_j\} |~\omega, a, b, \{t_j\}, \sigma) =
   \prod_{j=1}^{N} \frac{1}{\sqrt{2\pi\sigma^2}} \exp\left(
-  \frac{-[y_j - f(t_j|a, b, \omega)]^2}{2\sigma^2}
-  \right)
+  \frac{-[y_j - f(t_j|a, b, \omega)]^2}{2\sigma^2} \right)
 \end{equation}
 
 For any choice of $\omega$, we can find values $[a_0(\omega), b_0(\omega)]$ which maximize this likelihood. The goodness-of-fit can be determined by evaluating $\chi^2$ at this maximum:
@@ -27,10 +28,12 @@ For any choice of $\omega$, we can find values $[a_0(\omega), b_0(\omega)]$ whic
 If we define $\chi_0^2 = \sigma^{-2}\sum y_j^2$, then we can write the {\it Lomb-Scargle Periodogram} as
 
 \begin{equation}
+\label{eq:PLS} 
   P_{LS}(\omega) \equiv 1 - \frac{\chi^2(\omega)}{\chi_0^2}
 \end{equation}
 
-This periodogram is a normalized measure of the goodness-of-fit of a sinusoidal model with frequency $\omega$. Here I've purposely left-out the actual computation of $a_0(\omega)$ and $b_0(\omega)$, as well as the explicit expression to compute $P_{LS}(\omega)$; we'll get to that below.
+This periodogram is a normalized measure of the goodness-of-fit of a sinusoidal model with frequency $\omega$. 
+The best value of  $\omega$ is chosen as the value that maximizes $P_{LS}(\omega)$. Here I've purposely left-out the actual computation of $a_0(\omega)$ and $b_0(\omega)$, as well as the explicit expression to compute $P_{LS}(\omega)$; we'll get to that below.
 
 \section{Computing $P_{LS}$}
 We can compute $P_{LS}$ using the above formalism.
@@ -50,27 +53,120 @@ where in the simple case above, $\theta = [a, b]^T$ and
 
 With this form, the $\chi^2$ can be concisely written
 \begin{equation}
-\chi^2(\omega, \theta) = \frac{1}{\sigma^2}||y - X_\omega b||^2
+\chi^2(\omega, \theta) = \frac{1}{\sigma^2}||y - X_\omega \theta||^2
 \end{equation}
-This can be minimized by the standard means to find the best-fit parameters:
+This $\chi^2$ can be minimized by the standard means (assuming fixed $\omega$) to find the best-fit parameters:
 \begin{equation}
-  b_0 = (X_\omega^TX_\omega)^{-1}X_\omega^Ty.
+\label{eq:thetaML} 
+  \theta_0 = (X_\omega^TX_\omega)^{-1}X_\omega^Ty.
 \end{equation}
-Plugging this back in to the expression for $\chi^2$ gives
+Plugging this result back in to the expression for $\chi^2$ gives
 \begin{equation}
+\label{eq:chi2}
   \chi^2(\omega) = \frac{1}{\sigma^2}\left[
     y^Ty - y^TX_\omega(X_\omega^TX_\omega)^{-1}X_\omega^Ty
     \right]
 \end{equation}
-and comparing to the aboe definition we see that
+and comparing to the above definition we see that
 \begin{equation}
   P_{LS}(\omega) = \frac{y^TX_\omega(X_\omega^TX_\omega)^{-1}X_\omega^Ty}{y^Ty}
 \end{equation}
 Normally $P_{LS}$ is defined as some recipe of products of sines and cosines: all of that is contained in the above expression, and we won't repeat it here. Further, it is possible to use some tricks involving fast Fourier transforms to quickly compute the above expression for many frequencies $\omega$, but we won't get into that here.
 
-The important point here is that fundamentally, the Lomb-Scargle periodogram is simply a normalized measure of the $\chi^2$ for a maximum-likelihood model fit of a particular single-frequency periodic model. Further, it's clear that by changing the definition of $X_\omega$ and adding more columns, we can quite easily account for an arbitrary offset $\mu$ (as in the {\it generalized Lomb-Scargle method} proposed by Zechmeister \& Kurster 2009), include non-uniform errors $\sigma_j$, compute the periodogram for an arbitrary multi-frequency model, etc.
+The important point here is that fundamentally, the Lomb-Scargle periodogram is simply a normalized measure of the $\chi^2$ for a {\bf maximum-likelihood model fit} of a particular single-frequency periodic model. Further, it's clear that by changing the definition of $X_\omega$ and adding more columns, we can quite easily account for an arbitrary offset $\mu$ (as in the {\it generalized Lomb-Scargle method} proposed by Zechmeister \& Kurster 2009), include non-uniform errors $\sigma_j$, compute the periodogram for arbitrary multi-harmonic and multi-frequency models, etc. For detailed discussion, see Section 10.3 in ICVG2014. 
 
-\section{Making this Robust}
-A well-known problem with the Lomb-Scargle periodogram is its lack of robustness to outliers: the Gaussian form of the likelihood expression means that if the errors $\sigma_j$ are mis-specified, the outlying point(s) will have an extremely large effect on the final fit. What is required is to replace the above $\chi^2$ computation with a robust model that can account for these errors.
+\section{Robust Periodogram based on Bayesian Approach}
+
+A well-known problem with the Lomb-Scargle periodogram is its lack of robustness to outliers: the Gaussian form of the likelihood expression means that if the errors $\sigma_j$ are mis-specified, the outlying point(s) might have a large effect on the final fit. 
+What is required is to replace the above $\chi^2$ computation with a robust model that can account for these errors.
+
+If we knew which points were outliers, then we would simply exclude them and
+apply standard Gaussian results to the remaining points (assuming that outliers
+represent a small fraction of the data set). We will assume that we do not have this
+information. Bayesian analysis enables a formal treatment of this problem, as well 
+as the ability to estimate which points are likely outliers using an objective framework.
+
+First, given $\{t_j, y_j, \sigma_j\}$, how do we assess whether non-Gaussianity is important? 
+In case of no outliers, we expect that
+\begin{equation}
+           \chi^2_{\rm dof} = {1 \over N-1} \chi^2(\omega_0) \approx 1,
+\end{equation}
+where $\chi^2(\omega_0)$ is given by eq.~\ref{eq:chi2}, and evaluated at $\omega=\omega_0$ which
+minimizes its value. If $\chi^2_{\rm dof}-1$ is a few times larger than $\sqrt{2/(N-1)}$, then it is unlikely
+(as given by the cumulative pdf for $\chi^2_{\rm dof}$ distribution) that our data set $\{t_j, y_j\}$ was 
+drawn from a distribution specified by the chosen model and Gaussian error distribution with 
+the claimed $\{\sigma_j\}$.
+
+
+\subsection{Bayesian Periodogram} 
+
+We start by reformulating the data likelihood from eq.~\ref{eq:dataL}  as
+\begin{eqnarray}
+\label{eq:dataL2} 
+    p(\{y_j, g_j\} |~\omega, \theta, \{t_j, \sigma_j\}) = \nonumber \\ 
+  \prod_{j=1}^{N} \left[ \frac{g_j}{\sqrt{2\pi\sigma_j^2}} \exp\left(
+  \frac{-[y_j - f(t_j|\omega, \theta)]^2}{2\sigma_j^2}\right) + 
+       (1-g_j) p_{\rm bad}(y_j|I) \right].
+\end{eqnarray}  
+Here $g_j$ is 1 if the data point is ``good'' and 0 if it came from the distribution
+of outliers, $p_{\rm bad}(y_j|I)$. In this model $p_{\rm bad}(y_j|I)$ applies to all
+outliers. Again, if we knew $g_j$ this would be an easy problem to solve.
+
+Since $\{g_j\}$ represent hidden variables, we shall treat them as model parameters and then
+marginalize over them to get $p(\theta|\{y_j, t_j, \sigma_j\} ,I)$. With a separable prior,
+which implies that the reliability of the measurements is decoupled from the true value
+of the quantity we are measuring,
+\begin{equation}
+        p(\theta,\{g_j\}|I) = p(\theta|I)  \, p(\{g_j\}|I),
+\end{equation}
+we get
+\begin{equation}
+   p(\theta,\{g_j\}|~\{y_j, t_j, \sigma_j\}, I) \propto \prod_{j=1}^{N} \left[ g_j p_{\rm good}(y_j)   + (1-g_j) p_{\rm bad}(y_j|I) \right] p(\{g_j\}|I),
+\end{equation}
+where we assumed uniform priors for parameters $\theta$ and introduced for notational simplicity
+\begin{equation}
+       p_{\rm good}(y_j) = \frac{1}{\sqrt{2\pi\sigma_j^2}} \exp\left(
+                  \frac{-[y_j - f(t_j|\omega, \theta)]^2}{2\sigma_j^2}\right). 
+\end{equation}
+Finally, marginalizing over $g_j$ gives
+\begin{equation}
+  p(\theta|~\{y_j, t_j, \sigma_j\}, I) \propto \int  p(\theta,\{g_j\}|~\{y_j, t_j, \sigma_j\}, I) \, d^N g_j.
+\end{equation}
+
+
+Following Section 5.6.7 in ICVG2014, in case of uniform priors for all $g_j$, marginalization over
+$g_j$ effectively replaces every $g_j$ by 1/2 and leads to 
+\begin{equation}
+\label{eq:Btheta}
+   p(\theta|~\{y_j, t_j, \sigma_j\}, I) \propto \prod_{j=1}^{N} \left[ p_{\rm good}(y_j)  + p_{\rm bad}(y_j|I) \right]. 
+\end{equation}
+
+
+
+\subsection{The Last Step?}
+
+The posterior pdf for $\theta$ given by eq.~\ref{eq:Btheta} can be used to obtain the MAP value $\theta_0$.
+By replacing $\theta_0$ from eq.~\ref{eq:thetaML} with this MAP estimate, the resulting robust 
+$\chi^2(\omega)$ is used instead of $\chi^2(\omega)$ given by eq.~\ref{eq:chi2}, yielding a robust equivalent
+of eq.~\ref{eq:PLS}. 
+
+Is \v{Z} missing something here? I understand that the addition of $p_{\rm bad}$ in eq.~\ref{eq:Btheta}
+prevents the use of closed-form solutions for $P_{LS}(\omega)$ (because taking the log of eq.~\ref{eq:Btheta} 
+doesn't result in a linear problem). Is this the only problem? 
+
+Can we use the same method here as used in the regression problem with straight line plus outliers? 
+
+Should we perhaps think of a procedure similar to EM algorithm? 
+
+ 
+
+\subsection{QA and Visualization} 
+
+An obvious plot is to compare Lomb-Scargle and Bomb-Scargle periodograms in the same figure. 
+
+One could make a 2D plot where the x axis is $\omega$ and the y axis is the $j$, the data point index.
+Each ($\omega, j$) pixel gets colored by its MAP value of $g_j$. 
+
+
 
 \end{document}
