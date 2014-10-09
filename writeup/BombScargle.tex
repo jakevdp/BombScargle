@@ -1,6 +1,10 @@
 \documentclass[12pt,pdftex]{article}
 
+\title{Robust Periodograms}
+\author{Jake Vanderplas, Zeljko Ivezic}
+
 \begin{document}
+\maketitle
 
 \section{Lomb-Scargle Periodogram}
 The Lomb-Scargle Periodogram is fundamentally a measure of a normalized chi-squared for fitting a sinusoidal model to data. Given data $\{t_j, y_j\}$ with homoscedastic Gaussian errors $\sigma$, and assuming that the mean was subtracted from ``raw'' data
@@ -73,6 +77,27 @@ and comparing to the above definition we see that
 Normally $P_{LS}$ is defined as some recipe of products of sines and cosines: all of that is contained in the above expression, and we won't repeat it here. Further, it is possible to use some tricks involving fast Fourier transforms to quickly compute the above expression for many frequencies $\omega$, but we won't get into that here.
 
 The important point here is that fundamentally, the Lomb-Scargle periodogram is simply a normalized measure of the $\chi^2$ for a {\bf maximum-likelihood model fit} of a particular single-frequency periodic model. Further, it's clear that by changing the definition of $X_\omega$ and adding more columns, we can quite easily account for an arbitrary offset $\mu$ (as in the {\it generalized Lomb-Scargle method} proposed by Zechmeister \& Kurster 2009), include non-uniform errors $\sigma_j$, compute the periodogram for arbitrary multi-harmonic and multi-frequency models, etc. For detailed discussion, see Section 10.3 in ICVG2014. 
+
+\section{Bayesian View}
+The Bayesian view of this also starts with the likelihood.
+We'll specify this in terms of $M_\omega$, which is our model for a given frequency $\omega$. In this case, the likelihood is:
+
+\begin{equation}
+  p(D|M_\omega,\theta) =
+  (2\pi\sigma^2)^{-N/2} \exp\left(
+  \frac{-||y - X_\omega\theta||^2}{2\sigma^2}
+  \right)
+\end{equation}
+applying Bayes' rule and marginalizing over $\theta$ gives:
+\begin{equation}
+  p(M_\omega|D) = \frac{1}{p(D)}\int p(D|M_\omega,\theta)p(M_\omega, \theta){\rm d}^N\theta
+\end{equation}
+If we assume uniform priors (i.e. $p(M_\omega, \theta) \propto 1$) then it can be shown (see Appendix):
+
+\begin{equation}
+  \frac{p(M_\omega|D)}{p(M_0|D)} \propto \exp\left(P_{LS}(\omega)\frac{y^Ty}{2\sigma^2}\right)
+\end{equation}
+where $M_0$ is the null model, defined as above with $X_\omega = 0$.
 
 \section{Robust Periodogram based on Bayesian Approach}
 
@@ -166,31 +191,6 @@ An obvious plot is to compare Lomb-Scargle and Bomb-Scargle periodograms in the 
 One could make a 2D plot where the x axis is $\omega$ and the y axis is the $j$, the data point index.
 Each ($\omega, j$) pixel gets colored by its MAP value of $g_j$. 
 
-\section{Bayesian View}
-The Bayesian view of this starts with the likelihood. We'll specify this in terms of $M_\omega$, which is our model for a given frequency $\omega$. In this case, the likelihood is:
-
-\begin{equation}
-  p(D|M_\omega,\theta) =
-  (2\pi\sigma^2)^{-N/2} \exp\left(
-  \frac{-||y - X_\omega\theta||^2}{2\sigma^2}
-  \right)
-\end{equation}
-
-We can then use Bayes' rule and marginalize over $\theta$ to write
-
-\begin{equation}
-  p(M_\omega|D) = \frac{1}{p(D)}\int p(D|M_\omega,\theta)p(M_\omega, \theta){\rm d}^N\theta
-\end{equation}
-If we assume uniform priors ($p(M_\omega, \theta) \propto 1$) then it can be shown (see Appendix):
-
-\begin{equation}
-  \frac{p(M_\omega|D)}{p(M_0|D)} \propto \exp\left(\frac{P_{LS}(\omega)}{2\sigma^2}\right)
-\end{equation}
-where $M_0$ is the null model, defined as above with $X_\omega = 0$.
-
-\section{Making this Robust}
-A well-known problem with the Lomb-Scargle periodogram is its lack of robustness to outliers: the Gaussian form of the likelihood expression means that if the errors $\sigma_j$ are mis-specified, the outlying point(s) will have an extremely large effect on the final fit. What is required is to replace the above $\chi^2$ computation with a robust model that can account for these errors.
-
 \section{Appendix}
 Here is the calculation of the Bayes factor for our model.
 
@@ -248,7 +248,7 @@ we see that we can express this
 We can compare two models using the odds ratio:
 \begin{equation}
   O_{\omega_1\omega_2} \equiv \frac{p(M_{\omega_2}|D)}{p(M_{\omega_1}|D)}
-  =\frac{p(M_{\omega_2})}{p(M_{\omega_1})}\sqrt{\frac{\det|X_{\omega_1}^TX_{\omega_1}|}{\det|X_{\omega_2}^TX_{\omega_2}|}}\exp\left(\frac{y^Ty(P_{LS}(\omega_2) - P_{LS}(\omega_1))}{2\sigma^2}\right)
+  =\frac{p(M_{\omega_2})}{p(M_{\omega_1})}\sqrt{\frac{\det|X_{\omega_1}^TX_{\omega_1}|}{\det|X_{\omega_2}^TX_{\omega_2}|}}\exp\left(\frac{y^Ty}{2\sigma^2}\left[P_{LS}(\omega_2) - P_{LS}(\omega_1)\right]\right)
 \end{equation}
 
 \end{document}
