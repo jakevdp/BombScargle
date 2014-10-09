@@ -92,12 +92,15 @@ applying Bayes' rule and marginalizing over $\theta$ gives:
 \begin{equation}
   p(M_\omega|D) = \frac{1}{p(D)}\int p(D|M_\omega,\theta)p(M_\omega, \theta){\rm d}^N\theta
 \end{equation}
-If we assume uniform priors (i.e. $p(M_\omega, \theta) \propto 1$) then it can be shown (see Appendix):
+If we assume uniform priors (i.e. $p(M_\omega, \theta) \propto 1$) then it can be shown (see Appendix) that the Bayesian odds ratio between the model $M_\omega$ and the null model $M_0$ is given by:
 
 \begin{equation}
-  \frac{p(M_\omega|D)}{p(M_0|D)} \propto \exp\left(P_{LS}(\omega)\frac{y^Ty}{2\sigma^2}\right)
+  O_\omega \equiv \frac{p(M_\omega|D)}{p(M_0|D)} \propto \exp\left(P_{LS}(\omega)\frac{y^Ty}{2\sigma^2}\right)
 \end{equation}
-where $M_0$ is the null model, defined as above with $X_\omega = 0$.
+
+This is our Bayesian alternative to the frequentist Lomb-Scargle periodogram.
+Maximizing $O_\omega$ across multiple values of $\omega$ gives us the best period in the Bayesian sense.
+The nice piece here is that, unlike the Lomb-Scargle result which is predicated on $\chi^2$ as a goodness-of-fit, our Bayesian model allows the insertion of any likelihood, including ones which may be robust to outliers. We'll consider this below.
 
 \section{Robust Periodogram based on Bayesian Approach}
 
@@ -221,14 +224,14 @@ where the length-N array $v$ satisfies $U^Tv = X_\omega^Ty$. Given this, we can 
 The expression $\phi = v - U\theta$ is now an $\mathbf{R}^N\to\mathbf{R}^N$ mapping with a Jacobian given by $U$, so we can change variables to $\phi$ in the above integral to simplify its evaluation:
 
 \begin{equation}
-  p(M_\omega|D) = \frac{p(M_\omega)}{p(D)}\frac{(2\pi\sigma^2)^{-N/2}}{\det|U|}
-\int{\rm d}^N\phi\exp\left(\frac{-||\phi||^2 - y^Ty + y^TX_\omega(X_\omega^TX_\omega)^{-1}X_\omega^Ty}{2\sigma^2}\right)
+  p(M_\omega|D) = \frac{p(M_\omega)}{p(D)}(2\pi\sigma^2)^{-N/2}
+\int\frac{{\rm d}^N\phi}{\det|U|}\exp\left(\frac{-||\phi||^2 - y^Ty + y^TX_\omega(X_\omega^TX_\omega)^{-1}X_\omega^Ty}{2\sigma^2}\right)
 \end{equation}
 
 Observing that $\det|U|^2 = \det|C| = \det|X_\omega^TX_\omega|$ and evaluating the (now straightforward) integral gives
 
 \begin{equation}
-  p(M_\omega|D) = \frac{p(M_\omega)}{p(D)}\frac{1}{2^N\sqrt{\det|X_\omega^TX_\omega|}}
+  p(M_\omega|D) = \frac{p(M_\omega)}{p(D)}\frac{1}{\sqrt{\det|X_\omega^TX_\omega|}}
   \exp\left(\frac{y^TX_\omega(X_\omega^TX_\omega)^{-1}X_\omega^Ty - y^Ty}{2\sigma^2}\right)
 \end{equation}
 
@@ -241,7 +244,7 @@ Recalling that
 we see that we can express this
 
 \begin{equation}
-  p(M_\omega|D) = \frac{p(M_\omega)}{p(D)}\frac{1}{2^N\sqrt{\det|X_\omega^TX_\omega|}}
+  p(M_\omega|D) = \frac{p(M_\omega)}{p(D)}\frac{1}{\sqrt{\det|X_\omega^TX_\omega|}}
   \exp\left(\frac{y^Ty(P_{LS}(\omega) - 1)}{2\sigma^2}\right)
 \end{equation}
 
@@ -249,6 +252,12 @@ We can compare two models using the odds ratio:
 \begin{equation}
   O_{\omega_1\omega_2} \equiv \frac{p(M_{\omega_2}|D)}{p(M_{\omega_1}|D)}
   =\frac{p(M_{\omega_2})}{p(M_{\omega_1})}\sqrt{\frac{\det|X_{\omega_1}^TX_{\omega_1}|}{\det|X_{\omega_2}^TX_{\omega_2}|}}\exp\left(\frac{y^Ty}{2\sigma^2}\left[P_{LS}(\omega_2) - P_{LS}(\omega_1)\right]\right)
+\end{equation}
+
+For the special case of $M_0$, where $X = 0$, we can show
+\begin{equation}
+\frac{p(M_{\omega}|D)}{p(M_0|D)} =
+\frac{p(M_{\omega})}{p(M_0)}\sqrt{\frac{2\pi\sigma^2}{\det|X_\omega^TX_\omega|}}\exp\left(\frac{y^Ty}{2\sigma^2}\left[P_{LS}(\omega) - 1\right]\right)
 \end{equation}
 
 \end{document}
