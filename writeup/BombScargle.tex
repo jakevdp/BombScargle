@@ -96,12 +96,13 @@ The reference model (with $X=0$) gives $\chi_0^2 = \sigma^{-2}y^Ty$, so we see t
 \end{equation}
 In the standard treatment, $P_{LS}$ is defined as some recipe of products of sines and cosines (e.g. Scargle 1982; Zechmeister \& Kurster 2009, ICVG2014): all of that is contained in the above expression, and we won't repeat it here. Further, it is possible to use some tricks involving fast Fourier transforms to quickly compute the above expression for many frequencies $\omega$, but we'll not get into those algorithmic considerations here.
 
-The important point here is that fundamentally, the Lomb-Scargle periodogram is simply a normalized measure of the $\chi^2$ for a {\bf maximum-likelihood model fit} of a particular single-frequency periodic model. Further, it's clear that by changing the definition of $X_\omega$ and adding more columns, we can quite easily account for an arbitrary offset $\mu$ (as in the {\it generalized Lomb-Scargle method} proposed by Zechmeister \& Kurster 2009), include non-uniform errors $\sigma_j$, compute the periodogram for arbitrary multi-harmonic and multi-frequency models, etc. For detailed discussion, see Section 10.3 in ICVG2014.
+The important point here is that fundamentally, the Lomb-Scargle periodogram is simply a normalized measure of the $\chi^2$ for a {\bf maximum-likelihood model fit} of a particular single-frequency periodic model. Further, it's clear that by changing the definition of $X_\omega$ and adding more columns, we can quite easily account for an arbitrary offset $\mu$ (as in the {\it floating-mean Lomb-Scargle method} proposed by Zechmeister \& Kurster 2009), include non-uniform errors $\sigma_j$, compute the periodogram for arbitrary multi-harmonic and multi-frequency models, etc. For detailed discussion, see Section 10.3 in ICVG2014.
 
 \jake{Show an example periodogram \& folded light curve here}
 
 \jake{Mention generalizations to multiple Fourier terms: Bretthorst 2003; Zechmeister \& Kurstur 2009. These are included in our formalism here!}
 
+\jake{This all needs to be slightly modified for heteroscedastic errors. Should we do this from the beginning, or mention it separately?}
 
 \subsection{Bayesian View of the Lomb-Scargle Periodogram}
 \jake{Mention Bretthorst's work in this area}
@@ -130,17 +131,43 @@ This is our Bayesian alternative to the frequentist Lomb-Scargle periodogram.
 Maximizing $O_\omega$ across multiple values of $\omega$ gives us the best period in the Bayesian sense.
 The beauty here is that, unlike the Lomb-Scargle result which is predicated on $\chi^2$ as a goodness-of-fit, our Bayesian model allows the insertion of any likelihood, including ones which may be robust to outliers. We'll consider this below.
 
-\jake{should we consider generalized LS from the beginning? in this case, the null model is not just $||y||^2$, but is $||y - \mu||^2$ where we solve for $\mu$: that is, $X_0 = [1, 1, \cdots 1]^T$. Nothing else needs to be modified, which is the nice part of this linear algebra approach!}
+\jake{should we consider floating-mean LS from the beginning? in this case, the null model is not just $||y||^2$, but is $||y - \mu||^2$ where we solve for $\mu$: that is, $X_0 = [1, 1, \cdots 1]^T$. Nothing else needs to be modified, which is the nice part of this linear algebra approach!}
 
 \section{Non-Robustness of the Classic Lomb-Scargle}
 
 \jake{Show a figure here, perhaps using LINEAR sample 1004849}
 
 \section{Robust Periodogram: Huber Loss}
-Follow Huber 1981 and use a general $M$-estimator corresponding to the Huber Loss (Huber 1963).
+{\it Follow Huber 1981 and use a general $M$-estimator corresponding to the Huber Loss (Huber 1963).}
+
+Huber (1981) proposed the $M$-estimator, which minimizes the generalized loss function
+\begin{equation}
+  \sum_i \rho(y_i|y).
+\end{equation}
+In the special case of the standard maximum-likelihood this loss function is proportional to the log of the likelihood:
+\begin{equation}
+  \rho(y_i|y) = \frac{(y_i - y)^2}{2\sigma_i^2}.
+\end{equation}
+This makes it clear that any outliers contribute quadratically to the loss, which is why they will have such a large effect on the fit.
+One way to address this is to soften these tails for distant points. Huber (1963) proposed a softer loss function, usually known as the {\it Huber Loss}:
+\begin{equation}
+  \rho_c(y_i|y) = \left\{
+  \begin{array}{ll}
+    \frac{1}{2}t^2; & |t| \le c \\
+    c|t| - \frac{1}{2}t^2; & |t| > c
+  \end{array}
+  \right.
+\end{equation}
+where we've defined $t_i \equiv (y_i - y) / \sigma_i$. Here $c$ is a free parameter which gives the cutoff (in units of $\sigma$) beyond which the loss function turns over.
+
+If we replace the standard $\chi^2$ goodness-of-fit with an adjusted goodness-of-fit based on this Huber loss, the result is a more robust estimate of the periodogram.
+
+\jake{I just realized that this procedure may actually increase the $\chi^2$ at the minima of the periodogram fairly significantly! We'll need to quantify the degree of this effect.}
 
 \section{Robust Periodogram: Iterative Drop-outs}
 ad-hoc procedural solution. Fit a model, drop outliers, repeat until it converges.
+
+\jake{I just realized an issue: the drop-outs will be different for each $\omega$! That is, for the wrong $\omega$ the $\chi^2$ should be very large. Should there be a limit on the number of dropped points?}
 
 
 \section{Robust Periodogram based on Bayesian Approach}
