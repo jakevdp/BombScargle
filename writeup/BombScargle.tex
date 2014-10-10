@@ -102,6 +102,8 @@ This is our Bayesian alternative to the frequentist Lomb-Scargle periodogram.
 Maximizing $O_\omega$ across multiple values of $\omega$ gives us the best period in the Bayesian sense.
 The nice piece here is that, unlike the Lomb-Scargle result which is predicated on $\chi^2$ as a goodness-of-fit, our Bayesian model allows the insertion of any likelihood, including ones which may be robust to outliers. We'll consider this below.
 
+(JV: should we consider generalized LS from the beginning? in this case, the null model is not just $||y||^2$, but is $||y - \mu||^2$ where we solve for $\mu$: that is, $X_0 = [1, 1, \cdots 1]^T$. Nothing else needs to be modified, which is the nice part of this linear algebra approach!).
+
 \section{Robust Periodogram based on Bayesian Approach}
 
 A well-known problem with the Lomb-Scargle periodogram is its lack of robustness to outliers: the Gaussian form of the likelihood expression means that if the errors $\sigma_j$ are mis-specified, the outlying point(s) might have a large effect on the final fit. 
