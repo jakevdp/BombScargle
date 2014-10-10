@@ -6,11 +6,16 @@
 \newcommand{\zeljko}[1]{{\color{ForestGreen}\it[ZI: #1]}}
 \newcommand{\problem}[1]{{\color{red}\it[problem: #1]}}
 
-\title{Robust Periodograms}
+\title{Creating Robust Periodograms}
 \author{Jake Vanderplas, \v{Z}eljko Ivezi\'{c}}
 
 \begin{document}
+
 \maketitle
+
+\begin{abstract}
+The Lomb-Scargle periodogram is a well-known method of analyzing periodicity in unevenly-sampled time-series data. The problem with the LS approach is that it is not robust to outliers in data. In this paper we propose and compare three approaches to computing robust periodograms: a procedural iterative drop-out approach, a frequentist approach based on robust loss functions, and a Bayesian approach based on marginalization over nuisance parameters.
+\end{abstract}
 
 \section{The Plan}
 \begin{enumerate}
@@ -69,15 +74,14 @@ where in the simple case above, $\theta = [a, b]^T$ and
     \sin\omega t_N && \cos\omega t_N
   \end{array}\right]
 \end{equation}
-
-With this form, the $\chi^2$ can be concisely written
+Letting $y = [y_1, y_2\cdots y_N]^T$ be the vector of amplitudes, the $\chi^2$ expression can be concisely written
 \begin{equation}
 \chi^2(\omega, \theta) = \frac{1}{\sigma^2}||y - X_\omega \theta||^2
 \end{equation}
-This $\chi^2$ can be minimized by the standard means (assuming fixed $\omega$) to find the best-fit parameters:
+Assuming a fixed $\omega$, this $\chi^2$ can be minimized by standard means to find the best-fit parameters:
 \begin{equation}
 \label{eq:thetaML}
-  \theta_0 = (X_\omega^TX_\omega)^{-1}X_\omega^Ty.
+  \theta_0(\omega) = (X_\omega^TX_\omega)^{-1}X_\omega^Ty.
 \end{equation}
 Plugging this result back in to the expression for $\chi^2$ gives
 \begin{equation}
@@ -86,15 +90,18 @@ Plugging this result back in to the expression for $\chi^2$ gives
     y^Ty - y^TX_\omega(X_\omega^TX_\omega)^{-1}X_\omega^Ty
     \right]
 \end{equation}
-and comparing to the above definition we see that
+The reference model (with $X=0$) gives $\chi_0^2 = \sigma^{-2}y^Ty$, so we see that
 \begin{equation}
   P_{LS}(\omega) = \frac{y^TX_\omega(X_\omega^TX_\omega)^{-1}X_\omega^Ty}{y^Ty}
 \end{equation}
-Normally $P_{LS}$ is defined as some recipe of products of sines and cosines: all of that is contained in the above expression, and we won't repeat it here. Further, it is possible to use some tricks involving fast Fourier transforms to quickly compute the above expression for many frequencies $\omega$, but we won't get into that here.
+In the standard treatment, $P_{LS}$ is defined as some recipe of products of sines and cosines (e.g. Scargle 1982; Zechmeister \& Kurster 2009, ICVG2014): all of that is contained in the above expression, and we won't repeat it here. Further, it is possible to use some tricks involving fast Fourier transforms to quickly compute the above expression for many frequencies $\omega$, but we'll not get into those algorithmic considerations here.
 
 The important point here is that fundamentally, the Lomb-Scargle periodogram is simply a normalized measure of the $\chi^2$ for a {\bf maximum-likelihood model fit} of a particular single-frequency periodic model. Further, it's clear that by changing the definition of $X_\omega$ and adding more columns, we can quite easily account for an arbitrary offset $\mu$ (as in the {\it generalized Lomb-Scargle method} proposed by Zechmeister \& Kurster 2009), include non-uniform errors $\sigma_j$, compute the periodogram for arbitrary multi-harmonic and multi-frequency models, etc. For detailed discussion, see Section 10.3 in ICVG2014.
 
-\jake{mention generalized periodogram, where we fit for the mean as well}
+\jake{Show an example periodogram \& folded light curve here}
+
+\jake{Mention generalizations to multiple Fourier terms: Bretthorst 2003; Zechmeister \& Kurstur 2009. These are included in our formalism here!}
+
 
 \subsection{Bayesian View of the Lomb-Scargle Periodogram}
 \jake{Mention Bretthorst's work in this area}
@@ -115,18 +122,26 @@ applying Bayes' rule and marginalizing over $\theta$ gives:
 If we assume uniform priors (i.e. $p(\omega, \theta) \propto 1$) then it can be shown (see Appendix) that the Bayesian odds ratio between the model $\omega$ and the null model $M_0$ is given by:
 
 \begin{equation}
-  O_\omega \equiv \frac{p(\omega|D)}{p(M_0|D)} \propto \exp\left(P_{LS}(\omega)\frac{y^Ty}{2\sigma^2}\right)
+  O_\omega \equiv \frac{p(\omega|D)}{p(M_0|D)} \propto \exp\left(\frac{\chi^2(\omega)}{2\sigma^2}\right) \propto \exp\left(\frac{\chi_0^2}{2\sigma^2}P_{LS}(\omega)\right)
 \end{equation}
+
 
 This is our Bayesian alternative to the frequentist Lomb-Scargle periodogram.
 Maximizing $O_\omega$ across multiple values of $\omega$ gives us the best period in the Bayesian sense.
-The nice piece here is that, unlike the Lomb-Scargle result which is predicated on $\chi^2$ as a goodness-of-fit, our Bayesian model allows the insertion of any likelihood, including ones which may be robust to outliers. We'll consider this below.
+The beauty here is that, unlike the Lomb-Scargle result which is predicated on $\chi^2$ as a goodness-of-fit, our Bayesian model allows the insertion of any likelihood, including ones which may be robust to outliers. We'll consider this below.
 
 \jake{should we consider generalized LS from the beginning? in this case, the null model is not just $||y||^2$, but is $||y - \mu||^2$ where we solve for $\mu$: that is, $X_0 = [1, 1, \cdots 1]^T$. Nothing else needs to be modified, which is the nice part of this linear algebra approach!}
 
-\section{Failure of Lomb-Scargle in the Presense of Outliers}
+\section{Non-Robustness of the Classic Lomb-Scargle}
 
 \jake{Show a figure here, perhaps using LINEAR sample 1004849}
+
+\section{Robust Periodogram: Huber Loss}
+Follow Huber 1981 and use a general $M$-estimator corresponding to the Huber Loss (Huber 1963).
+
+\section{Robust Periodogram: Iterative Drop-outs}
+ad-hoc procedural solution. Fit a model, drop outliers, repeat until it converges.
+
 
 \section{Robust Periodogram based on Bayesian Approach}
 
@@ -194,25 +209,14 @@ $g_j$ effectively replaces every $g_j$ by 1/2 and leads to
    p(\theta|~\{y_j, t_j, \sigma_j\}, I) \propto \prod_{j=1}^{N} \left[ p_{\rm good}(y_j)  + p_{\rm bad}(y_j|I) \right]. 
 \end{equation}
 
+\jake{Show the expression for $p(\omega|~\{y_j, t_j, \sigma_j\}, I)$; this is what we compute via MCMC}
 
-
-\subsection{The Last Step?}
-
-The posterior pdf for $\theta$ given by eq.~\ref{eq:Btheta} can be used to obtain the MAP value $\theta_0$.
-By replacing $\theta_0$ from eq.~\ref{eq:thetaML} with this MAP estimate, the resulting robust 
-$\chi^2(\omega)$ is used instead of $\chi^2(\omega)$ given by eq.~\ref{eq:chi2}, yielding a robust equivalent
-of eq.~\ref{eq:PLS}. 
-
-\zeljko{Am I missing something here? I understand that the addition of $p_{\rm bad}$ in eq.~\ref{eq:Btheta}
-prevents the use of closed-form solutions for $P_{LS}(\omega)$ (because taking the log of eq.~\ref{eq:Btheta} 
-doesn't result in a linear problem). Is this the only problem? }
-
-\jake{ Yes - we need a robust alternative to the $\chi^2$ as well}
-
-\zeljko{Can we use the same method here as used in the regression problem with straight line plus outliers}
-
-\zeljko{Should we perhaps think of a procedure similar to EM algorithm?}
-
+\section{Discussion}
+\begin{enumerate}
+  \item compare the three approaches
+  \item compare results on several LINEAR curves
+  \item discuss computational issues  
+\end{enumerate}
  
 
 \subsection{QA and Visualization} 
@@ -220,9 +224,17 @@ doesn't result in a linear problem). Is this the only problem? }
 An obvious plot is to compare Lomb-Scargle and Bomb-Scargle periodograms in the same figure. 
 
 One could make a 2D plot where the x axis is $\omega$ and the y axis is the $j$, the data point index.
-Each ($\omega, j$) pixel gets colored by its MAP value of $g_j$. 
+Each ($\omega, j$) pixel gets colored by its MAP value of $g_j$.
 
-\section{Appendix}
+
+\section{Conclusion}
+This is what we did
+
+\section*{References}
+
+
+\appendix
+\section{Deriving the Bayesian Expression}
 Here is the calculation of the Bayes factor for our model.
 
 For separable priors $p(\omega,\theta) = p(\omega)p(\theta)$ the posterior for our linear model is:
