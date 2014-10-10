@@ -1,12 +1,28 @@
 \documentclass[12pt,pdftex]{article}
 
+
+\usepackage[usenames,dvipsnames]{color}
+\newcommand{\jake}[1]{{\color{blue}\it[JTV: #1]}}
+\newcommand{\zeljko}[1]{{\color{ForestGreen}\it[ZI: #1]}}
+\newcommand{\problem}[1]{{\color{red}\it[problem: #1]}}
+
 \title{Robust Periodograms}
 \author{Jake Vanderplas, \v{Z}eljko Ivezi\'{c}}
 
 \begin{document}
 \maketitle
 
-\section{Lomb-Scargle Periodogram}
+\section{The Plan}
+\begin{enumerate}
+  \item Derive classic (generalized) Lomb-Scargle
+  \item Demonstrate the non-robustness of the classic result
+  \item Show the Bayesian formulation \& the robust mixture-model version
+  \item Show the M-Estimator robust version (Huber's loss function)
+  \item Show the iterative dropout engineering solution
+  \item Compare results for robustness, computational complexity, etc.
+\end{enumerate}
+
+\section{The Lomb-Scargle Periodogram}
 The Lomb-Scargle Periodogram is fundamentally a measure of a normalized chi-squared for fitting a sinusoidal model to data. Given data $\{t_j, y_j\}$ with homoscedastic Gaussian errors $\sigma$, and assuming that the mean was subtracted from ``raw'' data
 values $\{y_j\}$, we can choose a single-term linear sinusoidal model defined by the frequency $\omega$ and amplitudes $a$ and $b$:
 
@@ -38,7 +54,7 @@ If we define $\chi_0^2 = \sigma^{-2}\sum y_j^2$, then we can write the {\it Lomb
 
 This periodogram is a normalized measure of the goodness-of-fit of a sinusoidal model with frequency $\omega$, as compared to the null hypothesis of a pure-noise constant model, and lies in the range $0 \le P_{LS} \le 1$.
 
-\section{Computing $P_{LS}$}
+\subsection{Computing $P_{LS}$}
 We can compute $P_{LS}$ quite easily via the above formalism.
 For later convenience, let's re-express our model in the form of a matrix-vector product:
 \begin{equation}
@@ -76,33 +92,41 @@ and comparing to the above definition we see that
 \end{equation}
 Normally $P_{LS}$ is defined as some recipe of products of sines and cosines: all of that is contained in the above expression, and we won't repeat it here. Further, it is possible to use some tricks involving fast Fourier transforms to quickly compute the above expression for many frequencies $\omega$, but we won't get into that here.
 
-The important point here is that fundamentally, the Lomb-Scargle periodogram is simply a normalized measure of the $\chi^2$ for a {\bf maximum-likelihood model fit} of a particular single-frequency periodic model. Further, it's clear that by changing the definition of $X_\omega$ and adding more columns, we can quite easily account for an arbitrary offset $\mu$ (as in the {\it generalized Lomb-Scargle method} proposed by Zechmeister \& Kurster 2009), include non-uniform errors $\sigma_j$, compute the periodogram for arbitrary multi-harmonic and multi-frequency models, etc. For detailed discussion, see Section 10.3 in ICVG2014. 
+The important point here is that fundamentally, the Lomb-Scargle periodogram is simply a normalized measure of the $\chi^2$ for a {\bf maximum-likelihood model fit} of a particular single-frequency periodic model. Further, it's clear that by changing the definition of $X_\omega$ and adding more columns, we can quite easily account for an arbitrary offset $\mu$ (as in the {\it generalized Lomb-Scargle method} proposed by Zechmeister \& Kurster 2009), include non-uniform errors $\sigma_j$, compute the periodogram for arbitrary multi-harmonic and multi-frequency models, etc. For detailed discussion, see Section 10.3 in ICVG2014.
 
-\section{Bayesian View}
+\jake{mention generalized periodogram, where we fit for the mean as well}
+
+\subsection{Bayesian View of the Lomb-Scargle Periodogram}
+\jake{Mention Bretthorst's work in this area}
+
 The Bayesian view of this also starts with the likelihood.
-We'll specify this in terms of $M_\omega$, which is our model for a given frequency $\omega$. In this case, the likelihood is:
+We'll specify this in terms of $\omega$, which is our model for a given frequency $\omega$. In this case, the likelihood is:
 
 \begin{equation}
-  p(D|M_\omega,\theta) =
+  p(D|\omega,\theta) =
   (2\pi\sigma^2)^{-N/2} \exp\left(
   \frac{-||y - X_\omega\theta||^2}{2\sigma^2}
   \right)
 \end{equation}
 applying Bayes' rule and marginalizing over $\theta$ gives:
 \begin{equation}
-  p(M_\omega|D) = \frac{1}{p(D)}\int p(D|M_\omega,\theta)p(M_\omega, \theta){\rm d}^N\theta
+  p(\omega|D) = \frac{1}{p(D)}\int p(D|\omega,\theta)p(\omega, \theta){\rm d}^N\theta
 \end{equation}
-If we assume uniform priors (i.e. $p(M_\omega, \theta) \propto 1$) then it can be shown (see Appendix) that the Bayesian odds ratio between the model $M_\omega$ and the null model $M_0$ is given by:
+If we assume uniform priors (i.e. $p(\omega, \theta) \propto 1$) then it can be shown (see Appendix) that the Bayesian odds ratio between the model $\omega$ and the null model $M_0$ is given by:
 
 \begin{equation}
-  O_\omega \equiv \frac{p(M_\omega|D)}{p(M_0|D)} \propto \exp\left(P_{LS}(\omega)\frac{y^Ty}{2\sigma^2}\right)
+  O_\omega \equiv \frac{p(\omega|D)}{p(M_0|D)} \propto \exp\left(P_{LS}(\omega)\frac{y^Ty}{2\sigma^2}\right)
 \end{equation}
 
 This is our Bayesian alternative to the frequentist Lomb-Scargle periodogram.
 Maximizing $O_\omega$ across multiple values of $\omega$ gives us the best period in the Bayesian sense.
 The nice piece here is that, unlike the Lomb-Scargle result which is predicated on $\chi^2$ as a goodness-of-fit, our Bayesian model allows the insertion of any likelihood, including ones which may be robust to outliers. We'll consider this below.
 
-(JV: should we consider generalized LS from the beginning? in this case, the null model is not just $||y||^2$, but is $||y - \mu||^2$ where we solve for $\mu$: that is, $X_0 = [1, 1, \cdots 1]^T$. Nothing else needs to be modified, which is the nice part of this linear algebra approach!).
+\jake{should we consider generalized LS from the beginning? in this case, the null model is not just $||y||^2$, but is $||y - \mu||^2$ where we solve for $\mu$: that is, $X_0 = [1, 1, \cdots 1]^T$. Nothing else needs to be modified, which is the nice part of this linear algebra approach!}
+
+\section{Failure of Lomb-Scargle in the Presense of Outliers}
+
+\jake{Show a figure here, perhaps using LINEAR sample 1004849}
 
 \section{Robust Periodogram based on Bayesian Approach}
 
@@ -179,13 +203,15 @@ By replacing $\theta_0$ from eq.~\ref{eq:thetaML} with this MAP estimate, the re
 $\chi^2(\omega)$ is used instead of $\chi^2(\omega)$ given by eq.~\ref{eq:chi2}, yielding a robust equivalent
 of eq.~\ref{eq:PLS}. 
 
-Is \v{Z} missing something here? I understand that the addition of $p_{\rm bad}$ in eq.~\ref{eq:Btheta}
+\zeljko{Am I missing something here? I understand that the addition of $p_{\rm bad}$ in eq.~\ref{eq:Btheta}
 prevents the use of closed-form solutions for $P_{LS}(\omega)$ (because taking the log of eq.~\ref{eq:Btheta} 
-doesn't result in a linear problem). Is this the only problem? 
+doesn't result in a linear problem). Is this the only problem? }
 
-Can we use the same method here as used in the regression problem with straight line plus outliers? 
+\jake{ Yes - we need a robust alternative to the $\chi^2$ as well}
 
-Should we perhaps think of a procedure similar to EM algorithm? 
+\zeljko{Can we use the same method here as used in the regression problem with straight line plus outliers}
+
+\zeljko{Should we perhaps think of a procedure similar to EM algorithm?}
 
  
 
@@ -199,10 +225,10 @@ Each ($\omega, j$) pixel gets colored by its MAP value of $g_j$.
 \section{Appendix}
 Here is the calculation of the Bayes factor for our model.
 
-For separable priors $p(M_\omega,\theta) = p(M_\omega)p(\theta)$ the posterior for our linear model is:
+For separable priors $p(\omega,\theta) = p(\omega)p(\theta)$ the posterior for our linear model is:
 
 \begin{equation}
-  p(M_\omega|D) = \frac{p(M_\omega)}{p(D)}\int{\rm d}^N\theta(2\pi\sigma^2)^{-N/2}\exp\left(\frac{-||y - X_\omega\theta||^2}{2\sigma^2}\right)
+  p(\omega|D) = \frac{p(\omega)}{p(D)}\int{\rm d}^N\theta(2\pi\sigma^2)^{-N/2}\exp\left(\frac{-||y - X_\omega\theta||^2}{2\sigma^2}\right)
 \end{equation}
 
 We can compute this integral by completing the square in $\theta$. Let's look at the argument of the exponent:
@@ -226,14 +252,14 @@ where the length-N array $v$ satisfies $U^Tv = X_\omega^Ty$. Given this, we can 
 The expression $\phi = v - U\theta$ is now an $\mathbf{R}^N\to\mathbf{R}^N$ mapping with a Jacobian given by $U$, so we can change variables to $\phi$ in the above integral to simplify its evaluation:
 
 \begin{equation}
-  p(M_\omega|D) = \frac{p(M_\omega)}{p(D)}(2\pi\sigma^2)^{-N/2}
+  p(\omega|D) = \frac{p(\omega)}{p(D)}(2\pi\sigma^2)^{-N/2}
 \int\frac{{\rm d}^N\phi}{\det|U|}\exp\left(\frac{-||\phi||^2 - y^Ty + y^TX_\omega(X_\omega^TX_\omega)^{-1}X_\omega^Ty}{2\sigma^2}\right)
 \end{equation}
 
 Observing that $\det|U|^2 = \det|C| = \det|X_\omega^TX_\omega|$ and evaluating the (now straightforward) integral gives
 
 \begin{equation}
-  p(M_\omega|D) = \frac{p(M_\omega)}{p(D)}\frac{1}{\sqrt{\det|X_\omega^TX_\omega|}}
+  p(\omega|D) = \frac{p(\omega)}{p(D)}\frac{1}{\sqrt{\det|X_\omega^TX_\omega|}}
   \exp\left(\frac{y^TX_\omega(X_\omega^TX_\omega)^{-1}X_\omega^Ty - y^Ty}{2\sigma^2}\right)
 \end{equation}
 
@@ -246,7 +272,7 @@ Recalling that
 we see that we can express this
 
 \begin{equation}
-  p(M_\omega|D) = \frac{p(M_\omega)}{p(D)}\frac{1}{\sqrt{\det|X_\omega^TX_\omega|}}
+  p(\omega|D) = \frac{p(\omega)}{p(D)}\frac{1}{\sqrt{\det|X_\omega^TX_\omega|}}
   \exp\left(\frac{y^Ty(P_{LS}(\omega) - 1)}{2\sigma^2}\right)
 \end{equation}
 
