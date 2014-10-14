@@ -151,7 +151,7 @@ In the special case of the standard maximum-likelihood this loss function is pro
 This makes it clear that any outliers contribute quadratically to the loss, which is why they will have such a large effect on the fit.
 One way to address this is to soften these tails for distant points. Huber (1963) proposed a softer loss function, usually known as the {\it Huber Loss}:
 \begin{equation}
-  \rho_c(y_i|y) = \left\{
+  \rho_H(y_i|y,c) = \left\{
   \begin{array}{ll}
     \frac{1}{2}t^2; & |t| \le c \\
     c|t| - \frac{1}{2}t^2; & |t| > c
@@ -160,9 +160,17 @@ One way to address this is to soften these tails for distant points. Huber (1963
 \end{equation}
 where we've defined $t_i \equiv (y_i - y) / \sigma_i$. Here $c$ is a free parameter which gives the cutoff (in units of $\sigma$) beyond which the loss function turns over.
 
-If we replace the standard $\chi^2$ goodness-of-fit with an adjusted goodness-of-fit based on this Huber loss, the result is a more robust estimate of the periodogram.
+If we replace the standard $\chi^2$ goodness-of-fit with an adjusted goodness-of-fit based on this Huber loss, the result is a more robust estimate of the periodogram. Unlike the standard solution above, there is no closed-form version of this. Instead we must do this in a two-step process:
 
-\jake{I just realized that this procedure may actually increase the $\chi^2$ at the minima of the periodogram fairly significantly! We'll need to quantify the degree of this effect.}
+\begin{equation}
+  \theta_0(\omega, c) = \arg\min_\theta \sum_i\rho_H(y_i|X_\omega\theta, c)
+\end{equation}
+
+Once this is computed, the loss is simply $\sum\rho_H(y_i|X_\omega\theta_0,c)$, and the robust periodogram is
+
+\begin{equation}
+  P_{LS,H}(\omega|c) = 1 - \frac{\sum_i\rho_H(y_i|X_\omega\theta_0,c)}{\sum_i\rho_H(y_i|0,c)}
+\end{equation}
 
 \section{Robust Periodogram: Iterative Drop-outs}
 ad-hoc procedural solution. Fit a model, drop outliers, repeat until it converges.
