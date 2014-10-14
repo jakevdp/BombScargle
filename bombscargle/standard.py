@@ -79,32 +79,3 @@ def lomb_scargle_huber(t, y, dy, omegas, c=3, Nterms=1, compute_offset=False):
                                        compute_offset, c, True)
         P_LS[i] = 1 - (f0 / loss_reference)
     return P_LS
-
-
-if __name__ == '__main__':
-    import numpy as np
-    import matplotlib.pyplot as plt
-
-    t = 10 * np.random.rand(100)
-    dy = 0.1 + 0.1 * np.random.rand(100)
-    y = np.random.normal(np.sin(t) + 0.5 * np.sin(2 * t), dy)
-
-    i = np.random.random(len(y))
-    mask = (i > 0.8)
-    y[mask] += 2 * np.random.randn(mask.sum())
-
-    omega = np.logspace(-1, 1, 500)
-    PLS = lomb_scargle(t, y, dy, omega, Nterms=2,
-                       compute_offset=True)
-    PLS2 = lomb_scargle_huber(t, y, dy, omega, Nterms=2, c=5,
-                              compute_offset=True)
-
-    plt.figure()
-    plt.errorbar(t, y, dy, fmt='.k', ecolor='lightgray')
-
-    plt.figure()
-    plt.plot(omega, PLS, label='standard')
-    plt.plot(omega, PLS2, label='huber')
-    plt.ylim(-0.1, 1.1)
-    plt.legend()
-    plt.show()
